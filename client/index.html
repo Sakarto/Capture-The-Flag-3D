@@ -512,12 +512,13 @@
       }
       #dash-ring {
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
+        top: 6px;
+        left: 6px;
+        width: calc(100% - 12px);
+        height: calc(100% - 12px);
         border-radius: 50%;
         background: conic-gradient(#44ccff 100%, transparent 0);
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.5); /* subtle depth */
       }
     </style>
   </head>
@@ -1120,22 +1121,23 @@
       // ==================================================
       
       // ----- Dash Particles -----
-      const particleGeo = new THREE.CircleGeometry(0.5, 8);
+      const particleGeo = new THREE.CircleGeometry(1.1, 16); // Bigger than car width (2.0 diameter vs 2.0 width), smoother
       const particleMat = new THREE.MeshBasicMaterial({
-        color: 0xaaccff,
+        color: 0xffffff, // White
         transparent: true,
-        opacity: 0.6,
+        opacity: 0.9, // Start bright
         side: THREE.DoubleSide,
+        depthWrite: false, 
       });
 
       const particles = [];
       function spawnDashParticle(pos) {
         const m = new THREE.Mesh(particleGeo, particleMat.clone());
         m.position.copy(pos);
-        m.position.y = 0.1; // just above ground
+        m.position.y = 0.2; // above ground
         m.rotation.x = -Math.PI / 2;
         scene.add(m);
-        particles.push({ mesh: m, age: 0, life: 0.5 });
+        particles.push({ mesh: m, age: 0, life: 0.6 });
       }
 
       function updateParticles(dt) {
@@ -1147,8 +1149,8 @@
             particles.splice(i, 1);
           } else {
             const t = p.age / p.life;
-            p.mesh.scale.setScalar(1 - t * 0.5);
-            p.mesh.material.opacity = 0.6 * (1 - t);
+            p.mesh.scale.setScalar(1 - t * 0.3); // Shrink less
+            p.mesh.material.opacity = 0.9 * (1 - t); // Fade from 0.9
           }
         }
       }
@@ -1161,7 +1163,6 @@
           const dashRing = document.getElementById('dash-ring');
           if (!dashUi || !dashRing) return;
           
-          // Show only if joined (or handle logic inside animate)
           if (!joined) {
               dashUi.style.display = 'none';
               return;
@@ -1171,14 +1172,26 @@
           const inEnemyHalf = (team === 'red' && x > 0) || (team === 'blue' && x < 0);
           
           if (inEnemyHalf) {
-             dashUi.style.opacity = '0.3';
-             dashRing.style.background = 'none';
+             dashUi.style.opacity = '0.3'; // Faded when disabled
+             dashRing.style.background = 'none'; // No green ring
           } else {
              dashUi.style.opacity = '1.0';
-             const maxCool = 5.0; 
-             const ratio = 1.0 - (dashCool / maxCool);
-             const percent = Math.floor(ratio * 100);
-             dashRing.style.background = `conic-gradient(#44ccff ${percent}%, transparent 0)`;
+             
+             if (dashCool <= 0) {
+                 // READY: Full visible, Full neon green
+                 dashUi.style.opacity = '1.0';
+                 dashRing.style.background = 'rgba(0, 255, 120, 0.92)'; 
+             } else {
+                 // RECHARGING
+                 // Opacity ramps from 0.6 -> 1.0 as it fills
+                 const ratio = 1.0 - (dashCool / maxCool);
+                 const percent = Math.floor(ratio * 100);
+                 
+                 // "Unhighlighted" logic: dimmer when empty
+                 dashUi.style.opacity = (0.4 + 0.6 * ratio).toFixed(2);
+
+                 dashRing.style.background = `conic-gradient(rgba(0, 255, 120, 0.92) ${percent}%, transparent 0)`;
+             }
           }
       }
       
