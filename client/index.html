@@ -1079,7 +1079,7 @@
       const hud = document.getElementById("hud");
 
       // Input
-      const keys = { w: false, a: false, s: false, d: false };
+      const keys = { w: false, a: false, s: false, d: false, r: false };
       const keyEls = {
         w: document.getElementById("keyW"),
         a: document.getElementById("keyA"),
@@ -1109,6 +1109,10 @@
           keys.d = true;
           setKeyViz("d", true);
         }
+        if (e.code === "KeyR") {
+          keys.r = true;
+          // No visual key for R yet
+        }
       });
 
       window.addEventListener("keyup", (e) => {
@@ -1127,6 +1131,9 @@
         if (e.code === "KeyD") {
           keys.d = false;
           setKeyViz("d", false);
+        }
+        if (e.code === "KeyR") {
+          keys.r = false;
         }
       });
 

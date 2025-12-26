@@ -77,13 +77,14 @@
       const hud = document.getElementById("hud");
 
       // ----- Input -----
-      const keys = { w: false, a: false, s: false, d: false };
+      const keys = { w: false, a: false, s: false, d: false, r: false };
 
       window.addEventListener("keydown", (e) => {
         if (e.code === "KeyW") keys.w = true;
         if (e.code === "KeyA") keys.a = true;
         if (e.code === "KeyS") keys.s = true;
         if (e.code === "KeyD") keys.d = true;
+        if (e.code === "KeyR") keys.r = true;
       });
 
       window.addEventListener("keyup", (e) => {
@@ -91,6 +92,7 @@
         if (e.code === "KeyA") keys.a = false;
         if (e.code === "KeyS") keys.s = false;
         if (e.code === "KeyD") keys.d = false;
+        if (e.code === "KeyR") keys.r = false;
       });
       // ---- Multiplayer client ----
       const ws = new WebSocket("ws://localhost:8080");
@@ -119,6 +121,7 @@
             a: keys.a,
             s: keys.s,
             d: keys.d,
+            r: keys.r,
           })
         );
       }, 50);
