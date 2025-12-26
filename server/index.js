@@ -196,8 +196,7 @@ function makePlayer(id) {
     steer: 0,
     vx: 0,
     vz: 0,
-    vz: 0,
-    inputs: { w: false, a: false, s: false, d: false, r: false },
+    inputs: { w: false, a: false, s: false, d: false },
     spawnLockUntil: 0,
     ready: false,
     lastSeen: Date.now(),
@@ -206,10 +205,6 @@ function makePlayer(id) {
     kills: 0,
     captures: 0,
     points: 0,
-    
-    // ✅ Dash state
-    lastDashTime: -100, // allow dash immediately
-    dashUntil: 0, 
   };
 }
 
@@ -232,14 +227,6 @@ const MOVE = {
 const TURN = {
   rate: 5, // rad/sec at speed (tune 2.3–3.4)
   minTurnSpeed: 0.2, // allow a bit of steering at low speed
-};
-
-// ---- Dash Params ----
-const DASH = {
-  cooldown: 5.0, // seconds
-  duration: 0.5, // seconds (speed boost duration)
-  impulse: 80,   // instant velocity add
-  maxSpeedBoost: 100, // relaxed max speed during dash
 };
 
 // ---- HTTP: serve client/index.html ----
@@ -354,10 +341,8 @@ wss.on("connection", (ws) => {
 
       p.inputs.w = !!msg.w;
       p.inputs.a = !!msg.a;
-      p.inputs.a = !!msg.a;
       p.inputs.s = !!msg.s;
       p.inputs.d = !!msg.d;
-      p.inputs.r = !!msg.r; // Dash
       return;
     }
   });
@@ -484,36 +469,9 @@ setInterval(() => {
       p.vx *= dragFactor;
       p.vz *= dragFactor;
 
-      // ✅ Dash Logic
-      const isDashing = nowS < p.dashUntil;
-      
-      if (p.inputs.r && !isDashing) {
-         // check cooldown
-         if (nowS - p.lastDashTime >= DASH.cooldown) {
-            // check if in own half
-            const inOwnHalf = (p.team === 'red' && p.x < 0) || (p.team === 'blue' && p.x > 0);
-            if (inOwnHalf) {
-               // Perform Dash
-               p.lastDashTime = nowS;
-               p.dashUntil = nowS + DASH.duration;
-               
-               // Apply impulse in facing direction
-               const fx = Math.sin(p.yaw);
-               const fz = Math.cos(p.yaw);
-               p.vx += fx * DASH.impulse;
-               p.vz += fz * DASH.impulse;
-            }
-         }
-      }
-
       // ✅ clamp max speed based on half (own half = 60, enemy half = 50)
       const sp = Math.hypot(p.vx, p.vz);
-      let maxSp = maxSpeedForPlayer(p);
-      
-      // relax max speed if dashing
-      if (nowS < p.dashUntil) {
-          maxSp = Math.max(maxSp, DASH.maxSpeedBoost);
-      }
+      const maxSp = maxSpeedForPlayer(p);
 
       if (sp > maxSp) {
         const s = maxSp / sp;
