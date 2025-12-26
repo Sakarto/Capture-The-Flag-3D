@@ -1,0 +1,8 @@
+{
+  "name": "ctp-3d",
+  "private": true,
+  "scripts": {
+    "start": "npm --prefix server start"
+  }
+}
+
