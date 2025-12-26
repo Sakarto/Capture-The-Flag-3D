@@ -484,6 +484,41 @@
         opacity: 0.75;
         font-size: 13px;
       }
+      /* ----- Dash UI ----- */
+      #dash-ui {
+        position: fixed;
+        bottom: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        font-family: system-ui;
+        font-size: 12px;
+        text-align: center;
+        z-index: 5;
+        opacity: 1;
+        transition: opacity 0.3s;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+      }
+      #dash-ring {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: conic-gradient(#44ccff 100%, transparent 0);
+      }
     </style>
   </head>
 
@@ -517,6 +552,12 @@
       <span class="titleBlack">Capture the Flag:</span>
       <span class="titleRed"> 3</span><span class="titleBlue">D</span>
     </div>
+    
+    <div id="dash-ui" style="display: none;">
+      <div id="dash-ring"></div>
+      <div style="z-index: 1; pointer-events: none;">Press R<br>to Dash</div>
+    </div>
+
     <!-- ✅ THIS MUST BE IN BODY (NOT INSIDE SCRIPT) -->
     <div id="join" class="overlay">
       <div class="panel">
@@ -1076,6 +1117,71 @@
       flagMeshes.blue.group.position.set(blueCheckX, 0.03, 0);
 
       // ==================================================
+      // ==================================================
+      
+      // ----- Dash Particles -----
+      const particleGeo = new THREE.CircleGeometry(0.5, 8);
+      const particleMat = new THREE.MeshBasicMaterial({
+        color: 0xaaccff,
+        transparent: true,
+        opacity: 0.6,
+        side: THREE.DoubleSide,
+      });
+
+      const particles = [];
+      function spawnDashParticle(pos) {
+        const m = new THREE.Mesh(particleGeo, particleMat.clone());
+        m.position.copy(pos);
+        m.position.y = 0.1; // just above ground
+        m.rotation.x = -Math.PI / 2;
+        scene.add(m);
+        particles.push({ mesh: m, age: 0, life: 0.5 });
+      }
+
+      function updateParticles(dt) {
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.age += dt;
+          if (p.age >= p.life) {
+            scene.remove(p.mesh);
+            particles.splice(i, 1);
+          } else {
+            const t = p.age / p.life;
+            p.mesh.scale.setScalar(1 - t * 0.5);
+            p.mesh.material.opacity = 0.6 * (1 - t);
+          }
+        }
+      }
+
+      // ----- Dash UI -----
+      let amIDashing = false;
+
+      function updateDashUi(dashCool, team, x) {
+          const dashUi = document.getElementById('dash-ui');
+          const dashRing = document.getElementById('dash-ring');
+          if (!dashUi || !dashRing) return;
+          
+          // Show only if joined (or handle logic inside animate)
+          if (!joined) {
+              dashUi.style.display = 'none';
+              return;
+          }
+          dashUi.style.display = 'flex';
+
+          const inEnemyHalf = (team === 'red' && x > 0) || (team === 'blue' && x < 0);
+          
+          if (inEnemyHalf) {
+             dashUi.style.opacity = '0.3';
+             dashRing.style.background = 'none';
+          } else {
+             dashUi.style.opacity = '1.0';
+             const maxCool = 5.0; 
+             const ratio = 1.0 - (dashCool / maxCool);
+             const percent = Math.floor(ratio * 100);
+             dashRing.style.background = `conic-gradient(#44ccff ${percent}%, transparent 0)`;
+          }
+      }
+      
       const hud = document.getElementById("hud");
 
       // Input
@@ -1111,7 +1217,6 @@
         }
         if (e.code === "KeyR") {
           keys.r = true;
-          // No visual key for R yet
         }
       });
 
@@ -1414,8 +1519,17 @@
         for (const p of msg.players) {
           alive.add(p.id);
 
+          // ✅ Dash particles for everyone
+          if (p.isDashing) {
+             // spawn at p.x, p.z
+             spawnDashParticle(new THREE.Vector3(p.x, 0.1, p.z));
+          }
+
           // ✅ NEVER render yourself as an "other car"
           if (p.id === myId) {
+               // Update Dash UI
+               amIDashing = !!p.isDashing;
+               updateDashUi(p.dashCool || 0, p.team, p.x);
             // if a ghost was created earlier, remove it now
             const ghost = otherCars.get(p.id);
             if (ghost) {
@@ -1715,6 +1829,7 @@
       const clock = new THREE.Clock();
       function animate() {
         const dt = Math.min(0.033, clock.getDelta());
+        updateParticles(dt);
         updateCamera(dt);
         applyMyCarInterpolation();
         // --- keep marker exactly on the collision radius at the front ---
