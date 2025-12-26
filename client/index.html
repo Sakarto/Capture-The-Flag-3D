@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Capture the Flag: 3D</title>
+    <style>
+      .readyBtn {
+        width: 100%;
+        margin-top: 12px;
+        padding: 16px 12px;
+        border-radius: 12px;
+        border: 0;
+        cursor: pointer;
+
+        font-family: system-ui;
+        font-weight: 900;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+
+        background: rgba(0, 255, 120, 0.92); /* neon green */
+        color: rgba(0, 0, 0, 0.9);
+
+        box-shadow: 0 0 18px rgba(0, 255, 120, 0.25),
+          inset 0 -2px 0 rgba(0, 0, 0, 0.25);
+      }
+
+      .readyBtn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .readyBtn.isReady {
+        background: rgba(120, 72, 32, 0.95); /* brown */
+        color: rgba(255, 255, 255, 0.95);
+        box-shadow: 0 0 18px rgba(120, 72, 32, 0.25),
+          inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+      }
+
+      .lobbyStartText {
+        margin-top: 12px;
+        text-align: center;
+        user-select: none;
+
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial,
+          sans-serif;
+        font-weight: 800;
+
+        /* ~0.9x your big title max size, but fits inside panel */
+        font-size: clamp(34px, 4.5vw, 86px);
+
+        color: rgba(220, 220, 220, 0.45);
+        -webkit-text-stroke: 5px rgba(255, 255, 255, 0.18);
+        text-shadow: 0 10px 30px rgba(0, 0, 0, 0.25),
+          0 2px 0 rgba(255, 255, 255, 0.1);
+      }
+      /* leaderboard box (separate from keys HUD) */
+      #leaderboardHud {
+        position: fixed;
+        right: 15px;
+        top: 250px;
+        z-index: 6;
+
+        width: 200px; /* wider so LEADERBOARD fits */
+        padding: 12px 12px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.14); /* same vibe as keys HUD */
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+
+        pointer-events: none;
+      }
+
+      #leaderboardTitle {
+        font-family: system-ui;
+        font-weight: 900;
+        font-size: 25px;
+        letter-spacing: 1px;
+        line-height: 1;
+
+        color: rgba(20, 20, 20, 0.95);
+        text-shadow: 0 2px 4px rgba(255, 255, 255, 0.35),
+          0 4px 12px rgba(0, 0, 0, 0.35);
+
+        width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .lbStatTitle {
+        font-family: system-ui;
+        font-weight: 900;
+        font-size: 21px; /* 1.1x of 24 */
+        color: rgba(0, 0, 0, 0.92);
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+
+        margin-top: 10px; /* spacing to separate sections */
+        margin-bottom: 4px; /* spacing before player lines */
+      }
+
+      .lbLine {
+        display: flex;
+        justify-content: flex-start; /* don’t force far apart */
+        align-items: baseline;
+        gap: 8px;
+
+        font-family: system-ui;
+        font-size: 15px; /* 0.9x of 12 */
+        line-height: 1.35;
+      }
+
+      .lbLineName {
+        font-weight: 900;
+        /* cleaner outline (less muddy than 4-way shadow) */
+        -webkit-text-stroke: 1px rgba(0, 0, 0, 0.65);
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+      }
+
+      .lbLineValue {
+        font-weight: 900;
+        color: rgba(255, 255, 255, 0.92);
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+        white-space: nowrap;
+      }
+      #titleScreenText {
+        position: fixed;
+        top: 6%; /* ✅ higher so it stays in the sky */
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 11;
+
+        font-family: ui-serif, Georgia, "Times New Roman", serif; /* ✅ fancier */
+        font-weight: 900;
+        font-size: clamp(
+          44px,
+          7vw,
+          96px
+        ); /* ✅ responsive so it won't smash UI */
+        letter-spacing: 1.5px;
+        line-height: 1;
+
+        white-space: nowrap; /* ✅ force one line */
+        user-select: none;
+        pointer-events: none;
+
+        /* ✅ subtle “premium” look */
+        text-shadow: 0 2px 0 rgba(255, 255, 255, 0.18),
+          0 10px 24px rgba(0, 0, 0, 0.25);
+      }
+
+      .titleBlack {
+        color: #000000;
+      }
+
+      .titleRed {
+        color: #99231d; /* blood red */
+      }
+
+      .titleBlue {
+        color: #000080; /* navy blue */
+      }
+      #scoreboard {
+        position: fixed;
+        top: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 7;
+
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        padding: 10px 14px;
+        border-radius: 14px;
+        background: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+
+        font-family: system-ui;
+        font-weight: 900;
+        letter-spacing: 0.6px;
+      }
+
+      #scoreboard .score {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      #scoreboard .sep {
+        opacity: 0.55;
+        color: white;
+        font-weight: 800;
+      }
+
+      #scoreboard .score.red {
+        color: #ff2800;
+      }
+      #scoreboard .score.blue {
+        color: #00b4d8;
+      }
+
+      #scoreboard .team {
+        opacity: 0.9;
+      }
+      :root {
+        --team-idle: #888;
+        --team-pressed: #555;
+      }
+
+      /* top-right WASD HUD */
+      #keysHud {
+        position: fixed;
+        right: 18px;
+        top: 18px;
+        z-index: 6;
+
+        width: 200px;
+        padding: 10px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+
+        pointer-events: none;
+
+        --team-rgb: 180, 180, 180;
+      }
+
+      #keysGrid {
+        display: grid;
+        grid-template-columns: 58px 58px 58px;
+        grid-template-rows: 58px 58px;
+        gap: 8px;
+        place-content: center;
+      }
+
+      /* layout like the image: W on top center, ASD bottom row */
+      #keyW {
+        grid-column: 2;
+        grid-row: 1;
+      }
+      #keyA {
+        grid-column: 1;
+        grid-row: 2;
+      }
+      #keyS {
+        grid-column: 2;
+        grid-row: 2;
+      }
+      #keyD {
+        grid-column: 3;
+        grid-row: 2;
+      }
+
+      /* team-colored keys */
+      .key {
+        display: grid;
+        place-items: center;
+        border-radius: 10px;
+
+        /* idle = lighter team color */
+        background: var(--team-idle);
+        border: 1px solid rgba(0, 0, 0, 0.35);
+
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial,
+          sans-serif;
+        font-weight: 900;
+        font-size: 40px;
+
+        color: rgba(245, 245, 245, 0.95);
+
+        /* matte */
+        text-shadow: none;
+        box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+
+        transform: scale(1);
+        transition: transform 80ms ease-out, background 80ms ease-out,
+          border-color 80ms ease-out;
+      }
+
+      .key.pressed {
+        /* pressed = darker navy / blood red */
+        background: var(--team-pressed);
+        border-color: rgba(0, 0, 0, 0.55);
+
+        transform: scale(1.1);
+      }
+      #freezeCountdown {
+        position: fixed;
+        left: 50%;
+        top: 35%;
+        transform: translate(-50%, -50%);
+        z-index: 20;
+        pointer-events: none;
+
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial,
+          sans-serif;
+        font-weight: 800;
+        font-size: 150px;
+
+        color: rgba(220, 220, 220, 0.45);
+        -webkit-text-stroke: 6px rgba(255, 255, 255, 0.18);
+        text-shadow: 0 10px 30px rgba(0, 0, 0, 0.25),
+          0 2px 0 rgba(255, 255, 255, 0.1);
+
+        display: none;
+        user-select: none;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+      #hud {
+        position: fixed;
+        left: 12px;
+        top: 12px;
+        z-index: 5;
+
+        /* ✅ make black text readable */
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+
+        font-family: system-ui;
+        font-size: 16px;
+        line-height: 1.35;
+        white-space: normal;
+      }
+
+      .hudLabel {
+        color: rgba(255, 255, 255, 0.85);
+        font-weight: 700;
+      }
+
+      .hudVal {
+        font-weight: 900; /* ✅ bold ONLY the data */
+      }
+
+      .hudValBlack {
+        color: rgba(0, 0, 0, 0.9); /* ✅ name + speed black */
+      }
+
+      .hudValTeam {
+        /* ✅ team value color set in JS */
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+      }
+
+      .overlay {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 10;
+      }
+
+      .panel {
+        width: min(520px, calc(100vw - 24px));
+        border-radius: 14px;
+        padding: 16px;
+        background: rgba(20, 20, 20, 0.92);
+        color: white;
+        font-family: system-ui;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+
+      .title {
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 10px;
+        text-align: center;
+      }
+
+      .label {
+        display: block;
+        opacity: 0.85;
+        margin: 8px 0 6px;
+      }
+
+      .input {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.08);
+        color: white;
+        outline: none;
+      }
+
+      .teamRow {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .teamBtn {
+        border: 0;
+        border-radius: 12px;
+
+        padding: 18px 12px; /* ⬅ taller buttons */
+
+        cursor: pointer;
+        color: white;
+        font-weight: 700;
+
+        display: grid;
+        gap: 6px;
+
+        text-align: center; /* ⬅ center text */
+        align-items: center; /* ⬅ vertical centering */
+      }
+
+      .teamBtn .count {
+        font-weight: 600;
+        opacity: 0.9;
+      }
+
+      .teamBtn.red {
+        background: rgba(255, 74, 74, 0.85);
+      }
+      .teamBtn.blue {
+        background: rgba(74, 163, 255, 0.85);
+      }
+      /* taller name input (only on join screen) */
+      .inputName {
+        padding: 16px 12px; /* taller */
+        font-size: 16px;
+      }
+
+      /* slightly taller team buttons */
+      .teamBtn {
+        padding: 16px 12px; /* was 12px 12px */
+      }
+      .teamBtn:disabled span {
+        opacity: 0.85;
+        font-size: 13px;
+        letter-spacing: 0.5px;
+      }
+      .title {
+        margin-bottom: 8px; /* was 10px */
+      }
+      .lists {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .list {
+        border-radius: 12px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .listTitle {
+        font-weight: 700;
+        margin-bottom: 6px;
+        opacity: 0.9;
+      }
+
+      .names {
+        font-size: 13px;
+        line-height: 1.35;
+        opacity: 0.95;
+        max-height: 140px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+
+      .hint {
+        margin-top: 10px;
+        opacity: 0.75;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="hud">Loading…</div>
+
+    <div id="keysHud" aria-hidden="true">
+      <div id="keysGrid">
+        <div id="keyW" class="key">W</div>
+        <div id="keyA" class="key">A</div>
+        <div id="keyS" class="key">S</div>
+        <div id="keyD" class="key">D</div>
+      </div>
+    </div>
+
+    <div id="leaderboardHud" aria-hidden="true">
+      <div id="leaderboardTitle">LEADERBOARD</div>
+      <div id="leaderboardMount"></div>
+    </div>
+
+    <div id="scoreboard" aria-hidden="true">
+      <div class="score red">
+        <span class="team">RED</span> <span id="scoreRed">0</span>
+      </div>
+      <div class="sep">–</div>
+      <div class="score blue">
+        <span class="team">BLUE</span> <span id="scoreBlue">0</span>
+      </div>
+    </div>
+    <div id="titleScreenText">
+      <span class="titleBlack">Capture the Flag:</span>
+      <span class="titleRed"> 3</span><span class="titleBlue">D</span>
+    </div>
+    <!-- ✅ THIS MUST BE IN BODY (NOT INSIDE SCRIPT) -->
+    <div id="join" class="overlay">
+      <div class="panel">
+        <div class="title">Join Game</div>
+
+        <input
+          id="nameInput"
+          class="input inputName"
+          placeholder="Player name"
+          maxlength="18"
+        />
+
+        <div class="teamRow">
+          <button id="btnRed" class="teamBtn red">
+            <span id="btnRedLabel">Join Red</span>
+            <div class="count" id="countRed">0</div>
+          </button>
+
+          <button id="btnBlue" class="teamBtn blue">
+            <span id="btnBlueLabel">Join Blue</span>
+            <div class="count" id="countBlue">0</div>
+          </button>
+        </div>
+        <button id="readyBtn" class="readyBtn" disabled>GET READY</button>
+
+        <div id="lobbyStartText" class="lobbyStartText" style="display: none">
+          Game Starting 5...
+        </div>
+        <div class="lists">
+          <div class="list">
+            <div class="listTitle">Red Team</div>
+            <div id="listRed" class="names">—</div>
+          </div>
+          <div class="list">
+            <div class="listTitle">Blue Team</div>
+            <div id="listBlue" class="names">—</div>
+          </div>
+        </div>
+
+        <div class="hint">Pick a team, then press GET READY.</div>
+      </div>
+    </div>
+
+    <div id="freezeCountdown">3</div>
+    <div id="pause" class="overlay" style="display: none"></div>
+
+    <script type="module">
+      import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+      // ✅ prevent ReferenceError (you can create it later if you want)
+      let frontMarker = null;
+      let pointerLocked = false;
+      let viewYaw = 0;
+      let viewPitch = 0;
+      // --- Respawn / spectator camera state ---
+      let completedInitialSpawn = false; // becomes true after the FIRST 3s lock ends
+      let prevLockLeft = 0;
+      let deathSpectatorUntil = 0;
+
+      // spectator position (similar to title screen, slightly closer)
+      const FIELD_SIZE = 500;
+      const HALF = FIELD_SIZE / 2;
+      const CAR_R = 1; // ✅ must match server CAR_R
+      const DEATH_SPEC_POS = new THREE.Vector3(0, 60, -HALF - 25);
+
+      function defaultSpawnYaw(team) {
+        // face toward the middle (x = 0)
+        return team === "red"
+          ? Math.PI / 2
+          : team === "blue"
+          ? -Math.PI / 2
+          : 0;
+      }
+
+      // set view to "inward like title screen"
+      function snapViewInwardLikeTitle() {
+        viewYaw = 0; // looking toward +Z from the back wall
+        viewPitch = -0.55; // slight downward tilt
+      }
+      const PITCH_LIMIT = Math.PI / 2 - 0.08;
+      const MOUSE_SENS = 0.0022;
+      // camera mode (future: hook to settings menu)
+      let cameraMode = "first"; // "first" | "third"
+
+      function setCameraMode(mode) {
+        cameraMode = mode;
+
+        const first = cameraMode === "first";
+
+        // hide your own body + name in first-person
+        car.visible = !first;
+        if (myLabel) myLabel.visible = !first;
+
+        // show hood strip only in first-person
+        if (myHood) myHood.visible = first;
+      }
+
+      document.addEventListener("pointerlockchange", () => {
+        const el = document.pointerLockElement;
+        pointerLocked = !!el; // good enough for your if (!pointerLocked) checks
+      });
+
+      function applyKeyColors(team) {
+        const root = document.documentElement;
+
+        if (team === "blue") {
+          root.style.setProperty("--team-idle", "#00b4d8"); // idle
+          root.style.setProperty("--team-pressed", "#000080"); // pressed
+        } else if (team === "red") {
+          root.style.setProperty("--team-idle", "#ff2800"); // idle
+          root.style.setProperty("--team-pressed", "#99231d"); // pressed
+        } else {
+          root.style.setProperty("--team-idle", "#888");
+          root.style.setProperty("--team-pressed", "#555");
+        }
+      }
+      function setKeysTeamColor(team) {
+        const hud = document.getElementById("keysHud");
+        if (!hud) return;
+
+        if (team === "red") {
+          hud.style.setProperty("--team-rgb", "255, 74, 74");
+        } else if (team === "blue") {
+          hud.style.setProperty("--team-rgb", "74, 163, 255");
+        } else {
+          hud.style.setProperty("--team-rgb", "180, 180, 180");
+        }
+      }
+
+      // ---- Join state (NO PROMPTS) ----
+      let myName = "";
+      let myTeam = null; // "red" | "blue" | null
+
+      const TEAM_COLORS = {
+        red: "#99231d",
+        blue: "#000080",
+      };
+
+      const teamColor = (t) => TEAM_COLORS[t] ?? "rgba(255,255,255,0.7)";
+
+      // ---- UI elements ----
+      const pauseEl = document.getElementById("pause");
+      let paused = false;
+      const readyBtn = document.getElementById("readyBtn");
+      const lobbyStartText = document.getElementById("lobbyStartText");
+      const leaderboardHud = document.getElementById("leaderboardHud");
+      const joinEl = document.getElementById("join");
+      const nameInput = document.getElementById("nameInput");
+      const btnRed = document.getElementById("btnRed");
+      const btnBlue = document.getElementById("btnBlue");
+      const countRed = document.getElementById("countRed");
+      const countBlue = document.getElementById("countBlue");
+      const listRed = document.getElementById("listRed");
+      const listBlue = document.getElementById("listBlue");
+      const freezeEl = document.getElementById("freezeCountdown");
+      const leaderboardMount = document.getElementById("leaderboardMount");
+      const btnRedLabel = document.getElementById("btnRedLabel");
+      const btnBlueLabel = document.getElementById("btnBlueLabel");
+      let myLockUntil = 0;
+      let hasTeam = false;
+      let isReady = false;
+      let inGame = false;
+      let serverRunning = false;
+      let wasServerRunning = false;
+      let joined = false;
+      let pendingJoin = false; // ✅ NEW
+
+      const lastPos = new Map(); // id -> {x,z,t}
+      function getVelocity(p) {
+        const nowT = performance.now() / 1000;
+        const prev = lastPos.get(p.id);
+        lastPos.set(p.id, { x: p.x, z: p.z, t: nowT });
+
+        if (!prev) return { vx: 0, vz: 0 };
+        const dt = Math.max(1e-4, nowT - prev.t);
+        return { vx: (p.x - prev.x) / dt, vz: (p.z - prev.z) / dt };
+      }
+      function showJoin() {
+        joined = false;
+        myTeam = null;
+        myName = "";
+        nameInput.value = "";
+        joinEl.style.display = "grid";
+        document.getElementById("titleScreenText").style.display = "block";
+        setInTitleScreen(true);
+      }
+      function scoreboardTeamColor(team) {
+        const el = document.querySelector(`#scoreboard .score.${team}`);
+        if (!el) return "rgba(255,255,255,0.9)";
+        return getComputedStyle(el).color;
+      }
+      function hideJoin() {
+        joinEl.style.display = "none";
+        document.getElementById("titleScreenText").style.display = "none";
+        setInTitleScreen(false);
+      }
+      function setInTitleScreen(on) {
+        document.getElementById("hud").style.display = on ? "none" : "block";
+        document.getElementById("keysHud").style.display = on ? "none" : "flex";
+        document.getElementById("scoreboard").style.display = on
+          ? "none"
+          : "flex";
+        if (leaderboardHud) leaderboardHud.style.display = on ? "none" : "flex";
+      }
+      // ---- Name sprite ----
+      function makeNameSprite(text, color = "white") {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = 384;
+        canvas.height = 96;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = "36px system-ui";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.lineWidth = 7;
+        ctx.strokeStyle = "rgba(0,0,0,0.75)";
+        ctx.fillStyle = color;
+        ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(12, 3.2, 1);
+        return sprite;
+      }
+
+      // ---- Three.js setup ----
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x66aaff);
+
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        innerWidth / innerHeight,
+        0.1,
+        1200
+      );
+      scene.add(camera);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(devicePixelRatio);
+      document.body.appendChild(renderer.domElement);
+      renderer.domElement.style.cursor = "crosshair"; // optional; gets hidden in pointer lock
+
+      pauseEl?.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        resumeFromPause();
+      });
+
+      function requestLock() {
+        if (!joined) return;
+        if (document.pointerLockElement === renderer.domElement) return;
+        renderer.domElement.requestPointerLock();
+      }
+
+      // click to lock when in game
+      renderer.domElement.addEventListener("mousedown", () => {
+        if (!joined) return;
+        if (paused) {
+          resumeFromPause();
+          return;
+        }
+        renderer.domElement.requestPointerLock();
+      });
+
+      // mouse-look
+      window.addEventListener("mousemove", (e) => {
+        if (!pointerLocked) return;
+
+        viewYaw -= e.movementX * MOUSE_SENS;
+        viewPitch -= e.movementY * MOUSE_SENS;
+
+        // clamp pitch like Minecraft
+        viewPitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, viewPitch));
+      });
+
+      window.addEventListener(
+        "keydown",
+        (e) => {
+          if (e.code !== "Escape") return;
+          if (!joined) return;
+
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (!paused) {
+            setPaused(true);
+          } else {
+            // optional: let ESC also resume (click already does)
+            // resumeFromPause();
+          }
+        },
+        true
+      );
+
+      renderer.domElement.tabIndex = 0;
+      renderer.domElement.style.outline = "none";
+      window.addEventListener("pointerdown", () => renderer.domElement.focus());
+
+      window.addEventListener("resize", () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(devicePixelRatio);
+      });
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+      const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+      dir.position.set(50, 80, 20);
+      scene.add(dir);
+
+      // Ground
+
+      const redGround = new THREE.Mesh(
+        new THREE.PlaneGeometry(HALF, FIELD_SIZE),
+        new THREE.MeshStandardMaterial({ color: 0xaa2222 })
+      );
+      redGround.rotation.x = -Math.PI / 2;
+      redGround.position.set(-HALF / 2, 0, 0);
+      scene.add(redGround);
+
+      const blueGround = new THREE.Mesh(
+        new THREE.PlaneGeometry(HALF, FIELD_SIZE),
+        new THREE.MeshStandardMaterial({ color: 0x2244aa })
+      );
+      blueGround.rotation.x = -Math.PI / 2;
+      blueGround.position.set(HALF / 2, 0, 0);
+      scene.add(blueGround);
+
+      const midLine = new THREE.Mesh(
+        new THREE.PlaneGeometry(2, FIELD_SIZE),
+        new THREE.MeshStandardMaterial({ color: 0xffffff })
+      );
+      midLine.rotation.x = -Math.PI / 2;
+      midLine.position.y = 0.02;
+      scene.add(midLine);
+
+      // Visual tiles (your existing stuff)
+      const YELLOW_DEPTH = 50;
+      const FRONT_OFFSET = 5;
+      const TILE = 1;
+      const CHECK_SIZE = 5;
+      const CHECK_Y = 0.03;
+
+      const blackMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+      const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+
+      function addCheckerboard(centerX, centerZ) {
+        const group = new THREE.Group();
+        for (let ix = 0; ix < CHECK_SIZE; ix++) {
+          for (let iz = 0; iz < CHECK_SIZE; iz++) {
+            const isWhite = (ix + iz) % 2 === 0;
+            const tile = new THREE.Mesh(
+              new THREE.PlaneGeometry(TILE, TILE),
+              isWhite ? whiteMat : blackMat
+            );
+            tile.rotation.x = -Math.PI / 2;
+            const ox = (ix - (CHECK_SIZE - 1) / 2) * TILE;
+            const oz = (iz - (CHECK_SIZE - 1) / 2) * TILE;
+            tile.position.set(centerX + ox, CHECK_Y, centerZ + oz);
+            group.add(tile);
+          }
+        }
+        scene.add(group);
+      }
+
+      const redCheckX = -(HALF - YELLOW_DEPTH) + FRONT_OFFSET;
+      const blueCheckX = +(HALF - YELLOW_DEPTH) - FRONT_OFFSET;
+      addCheckerboard(redCheckX, 0);
+      addCheckerboard(blueCheckX, 0);
+      // =============== BEACON (home return marker) ===============
+      function makeBeacon() {
+        const g = new THREE.Group();
+
+        const H = 180;
+
+        // checkerboard half-size = (CHECK_SIZE*TILE)/2 = 2.5
+        // pulse between inside + max == checkerboard
+        const minR = 1.5; // "a block or two on the inside"
+        const maxR = 2.5; // matches checkerboard half width
+
+        const geom = new THREE.CylinderGeometry(maxR, maxR, H, 28, 1, true);
+        const mat = new THREE.MeshBasicMaterial({
+          color: 0xffff55,
+          transparent: true,
+          opacity: 0.22,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        });
+
+        const pillar = new THREE.Mesh(geom, mat);
+        pillar.position.y = H / 2;
+        pillar.renderOrder = 10;
+
+        g.add(pillar);
+
+        g.userData = { pillar, H, minR, maxR };
+
+        g.visible = false;
+        scene.add(g);
+        return g;
+      }
+
+      const homeBeacon = makeBeacon();
+
+      function addGroundTile(x, z, color) {
+        const tile = new THREE.Mesh(
+          new THREE.PlaneGeometry(5, 5),
+          new THREE.MeshStandardMaterial({ color })
+        );
+        tile.rotation.x = -Math.PI / 2;
+        tile.position.set(x, CHECK_Y, z);
+        scene.add(tile);
+      }
+
+      addGroundTile(redCheckX + 30, 0, 0x00ff00);
+      addGroundTile(blueCheckX - 30, 0, 0x00ff00);
+      // ✅ Yellow “end zones”
+      const ZONE_WIDTH = 25; // same as your earlier code
+      const yellowMat = new THREE.MeshStandardMaterial({ color: 0xffff5c });
+
+      // red side (near -HALF wall)
+      const redZone = new THREE.Mesh(
+        new THREE.PlaneGeometry(ZONE_WIDTH, FIELD_SIZE),
+        yellowMat
+      );
+      redZone.rotation.x = -Math.PI / 2;
+      redZone.position.set(-HALF + ZONE_WIDTH / 2, 0.031, 0);
+      scene.add(redZone);
+
+      // blue side (near +HALF wall)
+      const blueZone = new THREE.Mesh(
+        new THREE.PlaneGeometry(ZONE_WIDTH, FIELD_SIZE),
+        yellowMat
+      );
+      blueZone.rotation.x = -Math.PI / 2;
+      blueZone.position.set(HALF - ZONE_WIDTH / 2, 0.031, 0);
+      scene.add(blueZone);
+
+      // Walls
+      const WALL_HEIGHT = 18;
+      const WALL_THICK = 4;
+      function addWall(x, z, width, depth) {
+        const m = new THREE.Mesh(
+          new THREE.BoxGeometry(width, WALL_HEIGHT, depth),
+          new THREE.MeshStandardMaterial({ color: 0xd3d3d3 })
+        );
+        m.position.set(x, WALL_HEIGHT / 2, z);
+        scene.add(m);
+      }
+      const B = FIELD_SIZE / 2;
+      addWall(0, +B, FIELD_SIZE + WALL_THICK, WALL_THICK);
+      addWall(0, -B, FIELD_SIZE + WALL_THICK, WALL_THICK);
+      addWall(+B, 0, WALL_THICK, FIELD_SIZE + WALL_THICK);
+      addWall(-B, 0, WALL_THICK, FIELD_SIZE + WALL_THICK);
+
+      // Car
+      const car = new THREE.Mesh(
+        new THREE.BoxGeometry(2, 2, 2),
+        new THREE.MeshStandardMaterial({ color: 0x111111 })
+      );
+      car.position.y = 0.3;
+      scene.add(car);
+
+      let myLabel = null;
+
+      const otherCars = new Map();
+      function makeOtherCar() {
+        const m = new THREE.Mesh(
+          new THREE.BoxGeometry(2, 2, 2),
+          new THREE.MeshStandardMaterial({ color: 0x111111 })
+        );
+        m.position.y = 0.3;
+        scene.add(m);
+        return m;
+      }
+
+      // --- 1st-person hood strip (camera-locked) ---
+      let myHood = null;
+
+      {
+        const hoodGeom = new THREE.BoxGeometry(2.25, 0.22, 0.35);
+        const hoodMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        hoodMat.depthTest = false; // draw on top
+        hoodMat.depthWrite = false;
+
+        myHood = new THREE.Mesh(hoodGeom, hoodMat);
+        myHood.renderOrder = 999;
+
+        // position in camera space (tweak these to taste)
+        myHood.position.set(0, -0.95, -1.35);
+
+        camera.add(myHood);
+        myHood.visible = false; // will be enabled in setCameraMode("first")
+      }
+
+      // ================= FLAGS (PART C) =================
+
+      const scoreRedEl = document.getElementById("scoreRed");
+      const scoreBlueEl = document.getElementById("scoreBlue");
+
+      function makeFlag(colorHex, flip = false) {
+        const g = new THREE.Group();
+
+        const POLE_R = 0.18;
+        const POLE_H = 8.0;
+
+        const pole = new THREE.Mesh(
+          new THREE.CylinderGeometry(POLE_R, POLE_R, POLE_H, 12),
+          new THREE.MeshStandardMaterial({
+            color: 0x222222,
+            roughness: 0.9,
+            metalness: 0.0,
+          })
+        );
+        pole.position.y = POLE_H / 2;
+        g.add(pole);
+
+        const CLOTH_W = 4.2;
+        const CLOTH_H = 2.4;
+
+        const cloth = new THREE.Mesh(
+          new THREE.PlaneGeometry(CLOTH_W, CLOTH_H),
+          new THREE.MeshStandardMaterial({
+            color: new THREE.Color(colorHex),
+            side: THREE.DoubleSide,
+          })
+        );
+
+        const side = flip ? -1 : 1;
+
+        // ✅ make plane "stick out" in -Z so it can trail behind
+        cloth.rotation.y = Math.PI / 2;
+        cloth.position.set(
+          side * (POLE_R + 0.02),
+          POLE_H * 0.78,
+          -CLOTH_W * 0.5
+        );
+
+        g.add(cloth);
+
+        g.userData.cloth = cloth;
+        g.userData.flip = flip;
+
+        return g;
+      }
+      const flagMeshes = {
+        red: { group: makeFlag("#ff2800", true) }, // ✅ face outside wall on red side
+        blue: { group: makeFlag("#00b4d8", false) }, // ✅ keep as-is
+      };
+
+      scene.add(flagMeshes.red.group);
+      scene.add(flagMeshes.blue.group);
+
+      // place on checkerboards
+      flagMeshes.red.group.position.set(redCheckX, 0.03, 0);
+      flagMeshes.blue.group.position.set(blueCheckX, 0.03, 0);
+
+      // ==================================================
+      const hud = document.getElementById("hud");
+
+      // Input
+      const keys = { w: false, a: false, s: false, d: false };
+      const keyEls = {
+        w: document.getElementById("keyW"),
+        a: document.getElementById("keyA"),
+        s: document.getElementById("keyS"),
+        d: document.getElementById("keyD"),
+      };
+
+      function setKeyViz(k, down) {
+        const el = keyEls[k];
+        if (!el) return;
+        el.classList.toggle("pressed", down);
+      }
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "KeyW") {
+          keys.w = true;
+          setKeyViz("w", true);
+        }
+        if (e.code === "KeyA") {
+          keys.a = true;
+          setKeyViz("a", true);
+        }
+        if (e.code === "KeyS") {
+          keys.s = true;
+          setKeyViz("s", true);
+        }
+        if (e.code === "KeyD") {
+          keys.d = true;
+          setKeyViz("d", true);
+        }
+      });
+
+      window.addEventListener("keyup", (e) => {
+        if (e.code === "KeyW") {
+          keys.w = false;
+          setKeyViz("w", false);
+        }
+        if (e.code === "KeyA") {
+          keys.a = false;
+          setKeyViz("a", false);
+        }
+        if (e.code === "KeyS") {
+          keys.s = false;
+          setKeyViz("s", false);
+        }
+        if (e.code === "KeyD") {
+          keys.d = false;
+          setKeyViz("d", false);
+        }
+      });
+
+      // WebSocket (same as your current)
+      const WS_PROTO = location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${WS_PROTO}://${location.host}`);
+
+      function closeWS() {
+        try {
+          ws.close(1000, "leaving");
+        } catch {}
+      }
+
+      window.addEventListener("pagehide", closeWS);
+      window.addEventListener("beforeunload", closeWS);
+      let myId = null;
+      let lastServerSpeed = 0;
+      const MODEL_YAW_OFFSET = Math.PI;
+      // ---- smoothing for my car (client-side interpolation) ----
+      const myBuf = []; // [{x,z,yaw,t}]
+      const INTERP_DELAY = 0.0001; // 50ms buffer (try 0.08–0.14)
+      let helloAck = false;
+
+      function sendHello() {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        if (!hasTeam) return; // allow in lobby after team pick
+        ws.send(JSON.stringify({ type: "hello", name: myName, team: myTeam }));
+      }
+      function applyTeamUIColors(team) {
+        const root = document.documentElement;
+
+        if (team === "red") {
+          root.style.setProperty("--team-idle", "#ff2800"); // 🔴 unpressed
+          root.style.setProperty("--team-pressed", "#99231d"); // 🔴 pressed
+        } else if (team === "blue") {
+          root.style.setProperty("--team-idle", "#00b4d8"); // 🔵 unpressed
+          root.style.setProperty("--team-pressed", "#000080"); // 🔵 pressed
+        }
+      }
+
+      function chooseTeam(team) {
+        const name = (nameInput.value ?? "").trim().slice(0, 18) || "Player";
+        myName = name;
+        myTeam = team;
+        hasTeam = true;
+        isReady = false;
+        updateTeamButtonsUI();
+
+        // UI
+        readyBtn.disabled = false;
+        readyBtn.classList.remove("isReady");
+        readyBtn.textContent = "GET READY";
+
+        // allow switching teams since not ready
+        btnRed.disabled = false;
+        btnBlue.disabled = false;
+
+        // send name/team to server (NO spawn anymore)
+        ws.send(JSON.stringify({ type: "hello", name: myName, team: myTeam }));
+        if (serverRunning) {
+          ws.send(JSON.stringify({ type: "spawn" }));
+        }
+      }
+      btnRed.addEventListener("click", () => chooseTeam("red"));
+      btnBlue.addEventListener("click", () => chooseTeam("blue"));
+
+      readyBtn.addEventListener("click", () => {
+        if (!hasTeam) return;
+
+        // ✅ If game already running, this button means "JOIN GAME"
+        if (serverRunning) {
+          pendingJoin = true;
+          ws.send(JSON.stringify({ type: "spawn" })); // ✅ ask server to spawn us
+          return;
+        }
+        // ✅ Otherwise we're in lobby: toggle ready
+        isReady = !isReady;
+
+        readyBtn.classList.toggle("isReady", isReady);
+        readyBtn.textContent = isReady ? "UNREADY" : "GET READY";
+
+        btnRed.disabled = isReady;
+        btnBlue.disabled = isReady;
+        updateTeamButtonsUI();
+
+        ws.send(JSON.stringify({ type: "ready", ready: isReady }));
+      });
+
+      ws.addEventListener("open", () => {
+        // show join UI only after socket is up (optional but clean)
+        showJoin();
+      });
+
+      ws.addEventListener("close", () => {
+        setTimeout(() => location.reload(), 200);
+      });
+
+      // send input 20x/sec ONLY after joining
+      setInterval(() => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        if (!joined) return;
+        if (paused) return;
+
+        ws.send(JSON.stringify({ type: "input", ...keys, yaw: viewYaw }));
+      }, 50);
+
+      // keep trying hello until server reflects it
+      setInterval(() => {
+        if (!hasTeam) return;
+        if (!helloAck) sendHello();
+      }, 800);
+
+      function esc(s) {
+        return String(s).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            }[c])
+        );
+      }
+
+      function fmtLine(entry) {
+        const name = entry?.name ?? "Player";
+        const team = entry?.team ?? null;
+        const value = Number(entry?.value ?? 0);
+
+        const col = team ? scoreboardTeamColor(team) : "rgba(255,255,255,0.9)";
+
+        return `
+                            <div class="lbLine">
+                              <span class="lbLineName" style="color:${col}">
+                                ${esc(name)}
+                              </span>
+                              <span class="lbLineValue">- ${value}</span>
+                            </div>
+                          `;
+      }
+
+      function renderTop(list, n = 2) {
+        const arr = Array.isArray(list) ? list : [];
+        let html = "";
+        for (let i = 0; i < n; i++) {
+          html += fmtLine(arr[i] ?? { name: "Player", team: null, value: 0 });
+        }
+        return html;
+      }
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        // lobby countdown UI
+        if (typeof msg.lobbyCountdown === "number" && msg.lobbyCountdown > 0) {
+          lobbyStartText.style.display = "block";
+          lobbyStartText.textContent = `Game Starting ${msg.lobbyCountdown}...`;
+        } else {
+          lobbyStartText.style.display = "none";
+        }
+
+        // when server starts game
+        serverRunning = msg.phase === "running";
+
+        if (serverRunning && !wasServerRunning) {
+          if (hasTeam && isReady) {
+            pendingJoin = true;
+            ws.send(JSON.stringify({ type: "spawn" }));
+          }
+        }
+
+        wasServerRunning = serverRunning;
+
+        // ✅ Update button label while sitting in overlay
+        if (!joined && hasTeam) {
+          if (serverRunning) {
+            readyBtn.disabled = false;
+            readyBtn.classList.remove("isReady");
+            readyBtn.textContent = "JOIN GAME";
+          } else {
+            // lobby
+            readyBtn.disabled = false;
+            readyBtn.textContent = isReady ? "UNREADY" : "GET READY";
+          }
+        }
+        if (msg.type === "welcome") {
+          myId = msg.id;
+          sendHello();
+          return;
+        }
+
+        // ✅ Auto-enter game as soon as the server includes our player
+        if (!joined && msg.phase === "running") {
+          const me = Array.isArray(msg.players)
+            ? msg.players.find((p) => p.id === myId)
+            : null;
+
+          if (me) {
+            enterGameNow(me);
+            pendingJoin = false;
+          }
+        }
+
+        // leaders
+
+        if (leaderboardMount) {
+          const leaders = msg.leaders ?? {
+            kills: [],
+            captures: [],
+            points: [],
+          };
+
+          leaderboardMount.innerHTML = `
+                            <div class="lbStatTitle">Kills:</div>
+                            ${renderTop(leaders.kills, 3)}
+
+                            <div class="lbStatTitle">Flag Captures:</div>
+                            ${renderTop(leaders.captures, 3)}
+
+                            <div class="lbStatTitle">Points:</div>
+                            ${renderTop(leaders.points, 3)}
+                          `;
+        }
+        // roster UI
+        const roster = Array.isArray(msg.roster) ? msg.roster : [];
+
+        function escHtml(s) {
+          return String(s).replace(
+            /[&<>"']/g,
+            (c) =>
+              ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;",
+              }[c])
+          );
+        }
+
+        function rosterLine(p) {
+          const nm = escHtml(p.name ?? "Player");
+
+          const col = p.team
+            ? scoreboardTeamColor(p.team)
+            : "rgba(255,255,255,0.9)";
+
+          const readyTag = p.ready
+            ? ` <span style="color: rgba(0,255,120,0.95); font-weight:900;">READY</span>`
+            : "";
+
+          return `<span style="color:${col}; font-weight:900;">${nm}</span>${readyTag}`;
+        }
+
+        const reds = roster.filter((p) => p.team === "red");
+        const blues = roster.filter((p) => p.team === "blue");
+
+        listRed.innerHTML = reds.map(rosterLine).join("<br>") || "—";
+        listBlue.innerHTML = blues.map(rosterLine).join("<br>") || "—";
+
+        countRed.textContent = `${reds.length} player${
+          reds.length === 1 ? "" : "s"
+        }`;
+        countBlue.textContent = `${blues.length} player${
+          blues.length === 1 ? "" : "s"
+        }`;
+
+        // scoreboard
+        if (msg.scores) {
+          scoreRedEl.textContent = String(msg.scores.red ?? 0);
+          scoreBlueEl.textContent = String(msg.scores.blue ?? 0);
+        }
+
+        // ...keep your existing players/flags update code here (INSIDE this handler)
+
+        const alive = new Set();
+
+        for (const p of msg.players) {
+          alive.add(p.id);
+
+          // ✅ NEVER render yourself as an "other car"
+          if (p.id === myId) {
+            // if a ghost was created earlier, remove it now
+            const ghost = otherCars.get(p.id);
+            if (ghost) {
+              scene.remove(ghost.mesh);
+              scene.remove(ghost.label);
+              otherCars.delete(p.id);
+            }
+
+            // only drive interpolation if you've actually joined
+            if (joined) {
+              const nowT = performance.now() / 1000;
+
+              lastServerSpeed = p.speed;
+              myLockUntil = p.lock ?? 0;
+
+              myBuf.push({ x: p.x, z: p.z, yaw: p.yaw, t: nowT });
+              while (myBuf.length > 30) myBuf.shift();
+
+              if (p.name === myName && p.team === myTeam) helloAck = true;
+
+              if (myLabel)
+                myLabel.position.set(car.position.x, 2.6, car.position.z);
+            }
+
+            continue; // ✅ skip the "other car" code
+          }
+
+          // ---- everyone else ----
+          let entry = otherCars.get(p.id);
+
+          if (!entry) {
+            const mesh = makeOtherCar();
+            const initialName = p.name ?? "Player";
+            const label = makeNameSprite(initialName, teamColor(p.team));
+            scene.add(label);
+            entry = { mesh, label, lastName: initialName };
+            otherCars.set(p.id, entry);
+          }
+
+          const newName = p.name ?? "Player";
+          if (newName !== entry.lastName) {
+            scene.remove(entry.label);
+            entry.label = makeNameSprite(newName, teamColor(p.team));
+            scene.add(entry.label);
+            entry.lastName = newName;
+          }
+
+          entry.mesh.position.x = p.x;
+          entry.mesh.position.z = p.z;
+          entry.mesh.rotation.y = p.yaw;
+          entry.label.position.set(p.x, 2.6, p.z);
+        }
+
+        for (const [id, entry] of otherCars) {
+          if (!alive.has(id)) {
+            scene.remove(entry.mesh);
+            scene.remove(entry.label);
+            otherCars.delete(id);
+          }
+        }
+        // ===== FLAGS UPDATE (PART D) =====
+        if (Array.isArray(msg.flags)) {
+          for (const f of msg.flags) {
+            const entry = flagMeshes[f.baseTeam];
+            if (!entry) continue;
+
+            if (f.carrier) {
+              const carrier = msg.players.find((p) => p.id === f.carrier);
+              if (carrier) {
+                entry.group.visible = true;
+
+                // keep above player (raise for taller pole)
+                entry.group.position.set(carrier.x, 3.4, carrier.z);
+
+                // rotate so cloth trails opposite motion
+                const { vx, vz } = getVelocity(carrier);
+                const speed2 = vx * vx + vz * vz;
+
+                if (speed2 > 0.02 * 0.02) {
+                  entry.group.rotation.y = Math.atan2(vx, vz);
+                }
+              } else {
+                entry.group.visible = false;
+              }
+            } else {
+              // not carried: show wherever server says it is (usually base)
+              entry.group.visible = true;
+              entry.group.position.set(f.x, 0.03, f.z);
+            }
+          }
+        }
+        // ===== HOME BEACON VISIBILITY =====
+        let carryingEnemy = false;
+
+        if (myTeam && myId && Array.isArray(msg.flags)) {
+          for (const f of msg.flags) {
+            // If the enemy flag is being carried by me
+            // enemy flag means: baseTeam !== myTeam
+            if (f.baseTeam !== myTeam && f.carrier === myId) {
+              carryingEnemy = true;
+              break;
+            }
+          }
+        }
+
+        if (myTeam && carryingEnemy) {
+          const homeX = myTeam === "red" ? redCheckX : blueCheckX;
+          homeBeacon.position.set(homeX, 0.03, 0);
+          homeBeacon.visible = true;
+        } else {
+          homeBeacon.visible = false;
+        }
+      };
+      function setPaused(on) {
+        paused = on;
+        if (pauseEl) pauseEl.style.display = on ? "grid" : "none";
+
+        // release mouse when paused; reacquire on resume (must be from a click)
+        if (on) {
+          if (document.pointerLockElement === renderer.domElement) {
+            document.exitPointerLock();
+          }
+        }
+      }
+
+      function resumeFromPause() {
+        setPaused(false);
+
+        // this is inside a click handler (gesture) so it WILL work
+        renderer.domElement.requestPointerLock();
+      }
+      function enterGameNow(me) {
+        const ghost = otherCars.get(myId);
+        car.visible = false; // hide your own body in 1st-person
+        if (ghost) {
+          scene.remove(ghost.mesh);
+          scene.remove(ghost.label);
+          otherCars.delete(myId);
+        }
+        if (joined) return; // ✅ joined is what your camera + input use
+        inGame = true;
+
+        // now actually hide overlay + show car
+        hideJoin();
+        setCameraMode(cameraMode); // re-apply current visibility rules
+        // ✅ snap to server spawn position immediately
+        if (me) {
+          car.position.x = me.x;
+          car.position.z = me.z;
+          myBuf.length = 0;
+          myBuf.push({
+            x: me.x,
+            z: me.z,
+            yaw: me.yaw, // ✅ keep server yaw here
+            t: performance.now() / 1000,
+          });
+        }
+
+        if (myLabel) scene.remove(myLabel);
+        myLabel = makeNameSprite(myName, teamColor(myTeam)); // your existing label style
+        scene.add(myLabel);
+
+        setCameraMode("first"); // for now: first-person only
+
+        // apply HUD/keys colors now that you're actually in game
+        applyKeyColors(myTeam);
+        setKeysTeamColor(myTeam);
+        applyTeamUIColors(myTeam);
+
+        joined = true; // only now we start sending input
+        // start your view facing the spawn yaw from server
+        viewYaw = defaultSpawnYaw(myTeam);
+        viewPitch = 0;
+        helloAck = false;
+        sendHello();
+        setPaused(true); // show blank overlay until user clicks to play
+      }
+      function lerp(a, b, t) {
+        return a + (b - a) * t;
+      }
+      function lerpAngle(a, b, t) {
+        let d = b - a;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        return a + d * t;
+      }
+      function applyMyCarInterpolation() {
+        if (!joined) return;
+        if (myBuf.length === 0) return;
+
+        const renderT = performance.now() / 1000 - INTERP_DELAY;
+
+        // If we're at/after the newest sample time, snap to latest (no freeze)
+        const last = myBuf[myBuf.length - 1];
+        if (renderT >= last.t || myBuf.length < 2) {
+          car.position.set(last.x, car.position.y, last.z);
+          car.rotation.y = last.yaw + MODEL_YAW_OFFSET;
+          if (myLabel)
+            myLabel.position.set(car.position.x, 2.6, car.position.z);
+          return;
+        }
+
+        // drop old samples so [0] is the last one <= renderT
+        while (myBuf.length >= 2 && myBuf[1].t <= renderT) myBuf.shift();
+
+        const a = myBuf[0];
+        const b = myBuf[1];
+        if (!a || !b) return;
+
+        // teleport snap (respawn/tag): if jump is huge, snap to b
+        const dx = b.x - a.x;
+        const dz = b.z - a.z;
+        if (dx * dx + dz * dz > 20 * 20) {
+          car.position.set(b.x, car.position.y, b.z);
+          car.rotation.y = b.yaw + MODEL_YAW_OFFSET;
+          if (myLabel)
+            myLabel.position.set(car.position.x, 2.6, car.position.z);
+          return;
+        }
+
+        const span = Math.max(0.0001, b.t - a.t);
+        let t = (renderT - a.t) / span;
+        t = Math.max(0, Math.min(1, t));
+
+        car.position.x = lerp(a.x, b.x, t);
+        car.position.z = lerp(a.z, b.z, t);
+        car.rotation.y = lerpAngle(a.yaw, b.yaw, t) + MODEL_YAW_OFFSET;
+
+        if (myLabel) myLabel.position.set(car.position.x, 2.6, car.position.z);
+      }
+      function updateTeamButtonsUI() {
+        if (!btnRedLabel || !btnBlueLabel) return;
+
+        // No team yet
+        if (!hasTeam) {
+          btnRedLabel.textContent = "Join Red";
+          btnBlueLabel.textContent = "Join Blue";
+          return;
+        }
+
+        // Not ready yet → normal join state
+        if (!isReady) {
+          btnRedLabel.textContent = "Join Red";
+          btnBlueLabel.textContent = "Join Blue";
+          return;
+        }
+
+        // Ready state
+        if (myTeam === "red") {
+          btnRedLabel.textContent = "YOU ARE ON RED";
+          btnBlueLabel.textContent = "CLICK UNREADY TO CHANGE TEAM";
+        } else if (myTeam === "blue") {
+          btnBlueLabel.textContent = "YOU ARE ON BLUE";
+          btnRedLabel.textContent = "CLICK UNREADY TO CHANGE TEAM";
+        }
+      }
+      function updateCamera(dt) {
+        // spectator camera before join (keep as-is)
+        if (!joined) {
+          const spectatorPos = new THREE.Vector3(0, 95, -HALF + 80);
+          const spectatorLook = new THREE.Vector3(0, 0, 0);
+          camera.position.lerp(spectatorPos, 1 - Math.exp(-4 * dt));
+          camera.lookAt(spectatorLook);
+          return;
+        }
+
+        const nowS = Date.now() / 1000;
+
+        // ✅ death spectator cam during the 3s lock AFTER you've spawned at least once
+        if (deathSpectatorUntil > nowS) {
+          camera.position.lerp(DEATH_SPEC_POS, 1 - Math.exp(-4 * dt));
+
+          // allow trackpad look during this spectator time
+          const dir = new THREE.Vector3(
+            Math.sin(viewYaw) * Math.cos(viewPitch),
+            Math.sin(viewPitch),
+            Math.cos(viewYaw) * Math.cos(viewPitch)
+          );
+
+          camera.lookAt(camera.position.clone().add(dir));
+          return;
+        }
+
+        // TRUE first-person (no smoothing)
+        const eye = car.position.clone().add(new THREE.Vector3(0, 2.2, 0));
+
+        const dir = new THREE.Vector3(
+          Math.sin(viewYaw) * Math.cos(viewPitch),
+          Math.sin(viewPitch),
+          Math.cos(viewYaw) * Math.cos(viewPitch)
+        );
+
+        camera.position.copy(eye);
+        camera.lookAt(eye.clone().add(dir));
+      }
+
+      const clock = new THREE.Clock();
+      function animate() {
+        const dt = Math.min(0.033, clock.getDelta());
+        updateCamera(dt);
+        applyMyCarInterpolation();
+        // --- keep marker exactly on the collision radius at the front ---
+        if (frontMarker) {
+          const nowS = Date.now() / 1000;
+
+          const firstPerson = cameraMode === "first";
+          const notSpectating = deathSpectatorUntil <= nowS;
+
+          const show = joined && firstPerson && notSpectating;
+
+          frontMarker.visible = false;
+
+          if (show) {
+            // world forward direction from viewYaw
+            const fx = Math.sin(viewYaw);
+            const fz = Math.cos(viewYaw);
+
+            frontMarker.position.set(
+              car.position.x + fx * CAR_R,
+              0.06, // slightly above ground to avoid z-fighting
+              car.position.z + fz * CAR_R
+            );
+          }
+        }
+        const teamCol = myTeam ? teamColor(myTeam) : "rgba(255,255,255,0.7)";
+        const teamLabel = myTeam
+          ? myTeam.charAt(0).toUpperCase() + myTeam.slice(1)
+          : "(none)";
+
+        hud.innerHTML =
+          `<span class="hudLabel">Name:</span> ` +
+          `<span class="hudVal hudValBlack">${esc(
+            myName || "(not joined)"
+          )}</span><br>` +
+          `<span class="hudLabel">Team:</span> ` +
+          `<span class="hudVal hudValTeam" style="color:${teamCol}">${esc(
+            teamLabel
+          )}</span><br>` +
+          `<span class="hudLabel">Speed:</span> ` +
+          `<span class="hudVal hudValBlack">${Number(
+            lastServerSpeed || 0
+          ).toFixed(2)} mph</span>`;
+
+        const nowS = Date.now() / 1000;
+        const left = myLockUntil - nowS;
+
+        // --- detect lock start/end to control death spectator + snap facing midline ---
+        if (joined) {
+          // lock STARTED
+          if (prevLockLeft <= 0.01 && left > 0.01) {
+            // Only use spectator mode if this is NOT the first spawn
+            if (completedInitialSpawn) {
+              deathSpectatorUntil = myLockUntil; // spectator lasts until lock ends
+              snapViewInwardLikeTitle(); // face inward like title page
+            }
+          }
+
+          // lock ENDED
+          if (prevLockLeft > 0.01 && left <= 0.01) {
+            // after ANY lock (initial or death), snap to face midline
+            viewYaw = defaultSpawnYaw(myTeam);
+            viewPitch = 0;
+
+            // the first time a lock ends, mark initial spawn as done
+            if (!completedInitialSpawn) completedInitialSpawn = true;
+
+            // ensure spectator mode is off
+            deathSpectatorUntil = 0;
+          }
+
+          prevLockLeft = left;
+        }
+
+        if (joined && left > 0.01) {
+          freezeEl.textContent = String(Math.min(3, Math.ceil(left)));
+          freezeEl.style.display = "block";
+        } else {
+          freezeEl.style.display = "none";
+        }
+        // beacon pulse
+        // beacon pulse (beam radius + opacity)
+        if (homeBeacon.visible) {
+          const t = performance.now() / 1000;
+
+          const pillar = homeBeacon.userData.pillar;
+          const minR = homeBeacon.userData.minR;
+          const maxR = homeBeacon.userData.maxR;
+
+          // 0..1 pulse
+          const s = 0.5 + 0.5 * Math.sin(t * 2.6);
+
+          // radius pulse: minR -> maxR
+          const r = minR + (maxR - minR) * s;
+
+          // scale X/Z to match target radius (geometry was built at maxR)
+          const k = r / maxR;
+          pillar.scale.set(k, 1, k);
+
+          // opacity pulse (subtle)
+          pillar.material.opacity = 0.14 + 0.1 * s;
+        }
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+      }
+      animate();
+    </script>
+  </body>
+</html>

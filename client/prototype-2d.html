@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <h3>WASD to move</h3>
+    <canvas
+      id="c"
+      width="800"
+      height="500"
+      style="border: 1px solid black"
+    ></canvas>
+
+    <script>
+      const walls = [
+        { x: 200, y: 150, w: 400, h: 30 }, // horizontal wall
+        { x: 200, y: 150, w: 30, h: 250 }, // vertical wall
+      ];
+      function clamp(v, min, max) {
+        return Math.max(min, Math.min(max, v));
+      }
+
+      function collideCircleRect(cx, cy, r, rect) {
+        const closestX = clamp(cx, rect.x, rect.x + rect.w);
+        const closestY = clamp(cy, rect.y, rect.y + rect.h);
+        const dx = cx - closestX;
+        const dy = cy - closestY;
+        return dx * dx + dy * dy <= r * r;
+      }
+      const camera = { x: 0, y: 0 };
+
+      const canvas = document.getElementById("c");
+      const ctx = canvas.getContext("2d");
+
+      // Make text visible
+      ctx.font = "16px sans-serif";
+
+      // Your player (this browser tab)
+      const player = {
+        x: 400,
+        y: 250,
+        angle: 0,
+        speed: 0,
+        vx: 0,
+        vy: 0,
+      };
+      const keys = { w: false, a: false, s: false, d: false };
+
+      // Multiplayer setup (run ONCE)
+      const ws = new WebSocket("ws://localhost:8080");
+      const myId = Math.random().toString(36).slice(2, 8);
+      const myName = (prompt("Enter your name:") || "Player").trim();
+      const others = new Map(); // id -> {x,y,name}
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key in keys) keys[e.key] = true;
+      });
+
+      window.addEventListener("keyup", (e) => {
+        if (e.key in keys) keys[e.key] = false;
+      });
+
+      // Receive other players
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+
+        if (msg.type === "pos" && msg.id !== myId) {
+          others.set(msg.id, {
+            x: msg.x,
+            y: msg.y,
+            vx: msg.vx || 0,
+            vy: msg.vy || 0,
+            name: msg.name || msg.id,
+            angle: msg.angle || 0,
+            speed: msg.speed || 0,
+          });
+        }
+      };
+
+      // Send your position 20x/second (including your name)
+      setInterval(() => {
+        if (ws.readyState === 1) {
+          ws.send(
+            JSON.stringify({
+              type: "pos",
+              id: myId,
+              name: myName,
+              x: player.x,
+              y: player.y,
+              angle: player.angle,
+              speed: player.speed,
+              vx: player.vx,
+              vy: player.vy,
+            })
+          );
+        }
+      }, 50);
+
+      function dot(ax, ay, bx, by) {
+        return ax * bx + ay * by;
+      }
+
+      function draw() {
+        // --- car physics ---
+        const accel = 0.25; // how fast we speed up
+        const maxSpeed = 6; // top speed
+        const friction = 0.98; // slows you down when not accelerating
+        const turnRate = 0.06; // how fast you turn
+
+        // accelerate / brake
+        if (keys.w) player.speed += accel;
+        if (keys.s) player.speed -= accel;
+
+        // clamp speed
+        if (player.speed > maxSpeed) player.speed = maxSpeed;
+        if (player.speed < -maxSpeed * 0.6) player.speed = -maxSpeed * 0.6; // reverse slower
+
+        // turning (turn more when moving)
+        if (keys.a)
+          player.angle -= turnRate * (Math.abs(player.speed) / maxSpeed + 0.2);
+
+        if (keys.d)
+          player.angle += turnRate * (Math.abs(player.speed) / maxSpeed + 0.2);
+
+        // --- drift physics (forward + sideways grip) ---
+        const gripSide = 0.8; // lower = more sideways drift
+        const drag = 0.99; // overall slow-down of velocity
+
+        const fx = Math.cos(player.angle);
+        const fy = Math.sin(player.angle);
+        const rx = -fy; // right vector (perpendicular)
+        const ry = fx;
+
+        const engine = 0.35; // how strong W/S feel
+        player.vx += fx * (keys.w ? engine : 0);
+        player.vy += fy * (keys.w ? engine : 0);
+        player.vx -= fx * (keys.s ? engine * 0.6 : 0);
+        player.vy -= fy * (keys.s ? engine * 0.6 : 0);
+
+        // decompose velocity into forward + sideways
+        const vForward = dot(player.vx, player.vy, fx, fy);
+        const vSide = dot(player.vx, player.vy, rx, ry);
+
+        // apply much stronger damping to sideways component only
+        const newVForward = vForward * drag;
+        const newVSide = vSide * gripSide;
+
+        // rebuild world velocity
+        player.vx = fx * newVForward + rx * newVSide;
+        player.vy = fy * newVForward + ry * newVSide;
+
+        // move
+        player.x += player.vx;
+        player.y += player.vy;
+        // --- collision (treat car as a circle) ---
+        const r = 10; // car radius
+        for (const wall of walls) {
+          if (collideCircleRect(player.x, player.y, r, wall)) {
+            // undo movement and "bounce" a bit by killing velocity
+            player.x -= player.vx;
+            player.y -= player.vy;
+            player.vx *= 0.2;
+            player.vy *= 0.2;
+            player.speed *= 0.5;
+            break;
+          }
+        }
+        // engine speed decays
+        player.speed *= friction;
+        camera.x = player.x - canvas.width / 2;
+        camera.y = player.y - canvas.height / 2;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(-camera.x, -camera.y);
+        // Grid (drawn in world space so it moves with the camera)
+        ctx.strokeStyle = "#ddd";
+        for (let x = -2000; x <= 2000; x += 100) {
+          ctx.beginPath();
+          ctx.moveTo(x, -2000);
+          ctx.lineTo(x, 2000);
+          ctx.stroke();
+        }
+        for (let y = -2000; y <= 2000; y += 100) {
+          ctx.beginPath();
+          ctx.moveTo(-2000, y);
+          ctx.lineTo(2000, y);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = "#000";
+
+        // Draw walls
+        // Draw walls
+        ctx.fillStyle = "#333";
+        for (const wall of walls) {
+          ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+        }
+        ctx.fillStyle = "#000";
+        // Draw YOU + your name
+        // Draw YOU (rotated car)
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.rotate(player.angle);
+        ctx.fillRect(-12, -7, 24, 14); // car body
+        ctx.restore();
+
+        ctx.fillText(`${myName} (YOU)`, player.x - 30, player.y - 16);
+
+        // Draw OTHERS with their names
+        for (const [id, p] of others) {
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.angle || 0);
+          ctx.fillRect(-12, -7, 24, 14);
+          ctx.restore();
+
+          ctx.fillText(p.name, p.x - 12, p.y - 16);
+        }
+        ctx.restore();
+        requestAnimationFrame(draw);
+      }
+
+      draw();
+    </script>
+  </body>
+</html>
