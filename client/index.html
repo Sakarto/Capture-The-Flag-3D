@@ -620,7 +620,7 @@
         viewPitch = -0.55; // slight downward tilt
       }
       const PITCH_LIMIT = Math.PI / 2 - 0.08;
-      const MOUSE_SENS = 0.0022;
+      const MOUSE_SENS = 0.0038;
       // camera mode (future: hook to settings menu)
       let cameraMode = "first"; // "first" | "third"
 
@@ -707,6 +707,7 @@
       let joined = false;
       let pendingJoin = false; // ✅ NEW
       let dashRequested = false;
+      const DASH_COOLDOWN_S = 5;
 
       const lastPos = new Map(); // id -> {x,z,t}
       function getVelocity(p) {
@@ -839,6 +840,7 @@
 
       window.addEventListener("keydown", (e) => {
         if (e.code === "KeyR") {
+          if (e.repeat) return; // ✅ prevents hold-to-spam
           dashRequested = true;
         }
       });
@@ -1029,6 +1031,10 @@
       let myHood = null;
       let dashDot = null;
       let dashDotText = null;
+      let dashRing = null;
+      let dashRingCanvas = null;
+      let dashRingCtx = null;
+      let dashRingTex = null;
       {
         const hoodGeom = new THREE.BoxGeometry(2.25, 0.22, 0.35);
         const hoodMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
@@ -1053,7 +1059,7 @@
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
           // Big "R"
-          ctx.font = "900 64px system-ui";
+          ctx.font = "900 35px system-ui";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.lineWidth = 8;
@@ -1063,10 +1069,10 @@
           ctx.fillText("R", canvas.width / 2, 50);
 
           // Small "to dash"
-          ctx.font = "900 28px system-ui";
+          ctx.font = "900 15px system-ui";
           ctx.lineWidth = 6;
-          ctx.strokeText("to dash", canvas.width / 2, 92);
-          ctx.fillText("to dash", canvas.width / 2, 92);
+          ctx.strokeText("to dash", canvas.width / 2, 85);
+          ctx.fillText("to dash", canvas.width / 2, 85);
 
           const tex = new THREE.CanvasTexture(canvas);
           tex.needsUpdate = true;
@@ -1077,25 +1083,51 @@
 
           const spr = new THREE.Sprite(mat);
           spr.renderOrder = 1001;
-          spr.scale.set(0.55, 0.275, 1); // sized to fit inside the circle
+          spr.scale.set(0.4, 0.2, 1); // sized to fit inside the circle
           return spr;
         }
 
+        // --- Cooldown ring (clock fill) ---
+        dashRingCanvas = document.createElement("canvas");
+        dashRingCanvas.width = 256;
+        dashRingCanvas.height = 256;
+        dashRingCtx = dashRingCanvas.getContext("2d");
+
+        dashRingTex = new THREE.CanvasTexture(dashRingCanvas);
+        dashRingTex.needsUpdate = true;
+
+        const ringMat = new THREE.SpriteMaterial({
+          map: dashRingTex,
+          transparent: true,
+        });
+        ringMat.depthTest = false;
+        ringMat.depthWrite = false;
+
+        dashRing = new THREE.Sprite(ringMat);
+        dashRing.renderOrder = 1002;
+
+        // same place as dashDot, slightly in front
+        dashRing.position.set(0, -0.73, -1.154);
+        dashRing.scale.set(0.2, 0.2, 1);
+
+        camera.add(dashRing);
+        dashRing.visible = false;
+
         // a bit bigger so the text fits (still inside the hood/player box)
-        const dotGeom = new THREE.CircleGeometry(0.13, 32);
+        const dotGeom = new THREE.CircleGeometry(0.07, 32);
         const dotMat = new THREE.MeshBasicMaterial({ color: 0xd3d3d3 });
         dotMat.depthTest = false;
         dotMat.depthWrite = false;
 
         dashDot = new THREE.Mesh(dotGeom, dotMat);
         dashDot.renderOrder = 1000;
-        dashDot.position.set(0, -0.95, -1.16);
+        dashDot.position.set(0, -0.73, -1.16);
         camera.add(dashDot);
         dashDot.visible = false;
 
         // text centered on the dot
         dashDotText = makeDashTextSprite();
-        dashDotText.position.set(0, -0.95, -1.155); // tiny nudge forward to avoid z-fight
+        dashDotText.position.set(0, -0.73, -1.155); // tiny nudge forward to avoid z-fight
         camera.add(dashDotText);
         dashDotText.visible = false;
       }
@@ -1694,6 +1726,100 @@
       }
       function applyMyCarInterpolation() {
         if (!joined) return;
+
+        const nowS = Date.now() / 1000;
+
+        // ===== DASH HUD (always runs; NOT tied to frontMarker) =====
+        if (dashDot && dashRing) {
+          const inOwnHalf =
+            (myTeam === "red" && car.position.x <= 0) ||
+            (myTeam === "blue" && car.position.x >= 0);
+
+          const cdEnd = myDashCooldownUntil ?? 0;
+          const remaining = Math.max(0, cdEnd - nowS);
+
+          const locked = (myLockUntil ?? 0) - nowS > 0.01; // ✅ uncolored during 3s spawn/death lock
+
+          let fracRaw = Math.min(
+            1,
+            Math.max(0, 1 - remaining / DASH_COOLDOWN_S)
+          ); // 0..1
+          if (locked) fracRaw = 0; // ✅ no fill during lock
+
+          const segProgress = fracRaw * 5; // 0..5 (one segment per second)
+
+          const offCooldown = remaining <= 0.0001;
+          const dashReady = joined && inOwnHalf && offCooldown && !locked; // ✅ not ready while locked
+
+          const firstPerson = cameraMode === "first";
+          const notSpectating = deathSpectatorUntil <= nowS;
+          const show = joined && firstPerson && notSpectating;
+
+          dashDot.visible = show;
+          dashDotText.visible = show;
+          dashRing.visible = show;
+
+          // base circle color (ready = neon green)
+          dashDot.material.color.setHex(dashReady ? 0x00ff78 : 0xd3d3d3);
+
+          // draw clockwise “clock fill”
+          if (dashRingCtx) {
+            const ctx = dashRingCtx;
+            const w = dashRingCanvas.width;
+            const h = dashRingCanvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            const cx = w / 2;
+            const cy = h / 2;
+            const r = 96;
+
+            // background faint ring
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.lineWidth = 22;
+            ctx.strokeStyle = "rgba(0,0,0,0.35)";
+            ctx.stroke();
+
+            // fill amount (starts at top, goes clockwise)
+            // 5 segments, each fills over 1 second
+            const start0 = -Math.PI / 2;
+            const total = Math.PI * 2;
+            const SEG = 5;
+            const gap = total * 0.03; // tiny gap between segments
+            const segSpan = total / SEG;
+
+            const fullSegs = Math.floor(segProgress); // 0..5
+            const partial = segProgress - fullSegs; // 0..1
+
+            ctx.lineWidth = 22;
+            ctx.lineCap = "round";
+            ctx.strokeStyle = dashReady
+              ? "rgba(0,255,120,0.95)"
+              : "rgba(210,210,210,0.92)";
+
+            // draw filled segments
+            for (let i = 0; i < SEG; i++) {
+              const segStart = start0 + i * segSpan + gap * 0.5;
+              const segEndFull = start0 + (i + 1) * segSpan - gap * 0.5;
+
+              let segEnd = segStart;
+              if (i < fullSegs) {
+                segEnd = segEndFull; // fully filled
+              } else if (i === fullSegs && fullSegs < SEG) {
+                segEnd = segStart + (segEndFull - segStart) * partial; // partially filled
+              } else {
+                continue; // not started yet
+              }
+
+              ctx.beginPath();
+              ctx.arc(cx, cy, r, segStart, segEnd, false);
+              ctx.stroke();
+            }
+
+            dashRingTex.needsUpdate = true;
+          }
+        }
+
         if (myBuf.length === 0) return;
 
         const renderT = performance.now() / 1000 - INTERP_DELAY;
@@ -1810,21 +1936,6 @@
         // --- keep marker exactly on the collision radius at the front ---
         if (frontMarker) {
           const nowS = Date.now() / 1000;
-
-          // Dash dot: neon green when R is ready (own half + no cooldown), else UI gray
-          if (dashDot) {
-            const inOwnHalf =
-              (myTeam === "red" && car.position.x <= 0) ||
-              (myTeam === "blue" && car.position.x >= 0);
-
-            const offCooldown = nowS >= (myDashCooldownUntil ?? 0);
-            const dashReady = joined && inOwnHalf && offCooldown;
-
-            const firstPerson = cameraMode === "first";
-            dashDot.visible = joined && firstPerson; // “inside the black of your character”
-            dashDot.material.color.setHex(dashReady ? 0x00ff78 : 0xd3d3d3);
-            if (dashDotText) dashDotText.visible = joined && firstPerson;
-          }
 
           const firstPerson = cameraMode === "first";
           const notSpectating = deathSpectatorUntil <= nowS;

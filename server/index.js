@@ -217,7 +217,7 @@ const MOVE = {
   brake: 150,
 
   // ✅ half-based max speeds
-  maxHome: 75, // in your own half
+  maxHome: 90, // in your own half
   maxAway: 50, // in enemy half (attacking)
 
   maxRev: 45,
@@ -227,7 +227,7 @@ const MOVE = {
 
 const DASH = {
   impulse: 35,
-  cooldown: 1.2,
+  cooldown: 5,
 };
 
 const TURN = {
