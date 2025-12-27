@@ -200,6 +200,7 @@ function makePlayer(id) {
     spawnLockUntil: 0,
     ready: false,
     lastSeen: Date.now(),
+    dashCooldownUntil: 0,
 
     // ✅ leaderboard stats
     kills: 0,
@@ -222,6 +223,11 @@ const MOVE = {
   maxRev: 45,
   drag: 1.5,
   stopEps: 0.02,
+};
+
+const DASH = {
+  impulse: 35,
+  cooldown: 1.2,
 };
 
 const TURN = {
@@ -333,6 +339,7 @@ wss.on("connection", (ws) => {
     }
 
     if (msg.type === "input") {
+      p.inputs.dash = !!msg.dash;
       if (typeof msg.yaw === "number" && Number.isFinite(msg.yaw)) {
         p.yaw = msg.yaw;
       }
@@ -439,6 +446,20 @@ setInterval(() => {
         continue;
       }
 
+      // "defender" rule: only on your own half
+      const inOwnHalf =
+        (p.team === "red" && p.x <= 0) || (p.team === "blue" && p.x >= 0);
+
+      if (p.inputs.dash && inOwnHalf && nowS >= (p.dashCooldownUntil ?? 0)) {
+        const fx = Math.sin(p.yaw);
+        const fz = Math.cos(p.yaw);
+
+        // add a forward impulse to velocity
+        p.vx += fx * DASH.impulse;
+        p.vz += fz * DASH.impulse;
+        p.dashCooldownUntil = nowS + DASH.cooldown;
+      }
+      p.inputs.dash = false; // consume dash input
       // inputs -> wish direction in camera yaw space
       const forwardIn = (p.inputs.w ? 1 : 0) - (p.inputs.s ? 1 : 0); // W/S
       const strafeIn = (p.inputs.a ? 1 : 0) - (p.inputs.d ? 1 : 0); // A = left
@@ -829,6 +850,7 @@ setInterval(() => {
               yaw: p.yaw,
               speed: p.speed,
               lock: p.spawnLockUntil ?? 0,
+              dashCd: p.dashCooldownUntil ?? 0,
             }))
         : [],
   };

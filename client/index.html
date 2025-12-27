@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
@@ -20,7 +20,8 @@
         background: rgba(0, 255, 120, 0.92); /* neon green */
         color: rgba(0, 0, 0, 0.9);
 
-        box-shadow: 0 0 18px rgba(0, 255, 120, 0.25),
+        box-shadow:
+          0 0 18px rgba(0, 255, 120, 0.25),
           inset 0 -2px 0 rgba(0, 0, 0, 0.25);
       }
 
@@ -32,7 +33,8 @@
       .readyBtn.isReady {
         background: rgba(120, 72, 32, 0.95); /* brown */
         color: rgba(255, 255, 255, 0.95);
-        box-shadow: 0 0 18px rgba(120, 72, 32, 0.25),
+        box-shadow:
+          0 0 18px rgba(120, 72, 32, 0.25),
           inset 0 -2px 0 rgba(0, 0, 0, 0.35);
       }
 
@@ -41,7 +43,12 @@
         text-align: center;
         user-select: none;
 
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial,
+        font-family:
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Arial,
           sans-serif;
         font-weight: 800;
 
@@ -50,7 +57,8 @@
 
         color: rgba(220, 220, 220, 0.45);
         -webkit-text-stroke: 5px rgba(255, 255, 255, 0.18);
-        text-shadow: 0 10px 30px rgba(0, 0, 0, 0.25),
+        text-shadow:
+          0 10px 30px rgba(0, 0, 0, 0.25),
           0 2px 0 rgba(255, 255, 255, 0.1);
       }
       /* leaderboard box (separate from keys HUD) */
@@ -82,7 +90,8 @@
         line-height: 1;
 
         color: rgba(20, 20, 20, 0.95);
-        text-shadow: 0 2px 4px rgba(255, 255, 255, 0.35),
+        text-shadow:
+          0 2px 4px rgba(255, 255, 255, 0.35),
           0 4px 12px rgba(0, 0, 0, 0.35);
 
         width: 100%;
@@ -133,7 +142,8 @@
         transform: translateX(-50%);
         z-index: 11;
 
-        font-family: ui-serif, Georgia, "Times New Roman", serif; /* ✅ fancier */
+        font-family:
+          ui-serif, Georgia, "Times New Roman", serif; /* ✅ fancier */
         font-weight: 900;
         font-size: clamp(
           44px,
@@ -148,7 +158,8 @@
         pointer-events: none;
 
         /* ✅ subtle “premium” look */
-        text-shadow: 0 2px 0 rgba(255, 255, 255, 0.18),
+        text-shadow:
+          0 2px 0 rgba(255, 255, 255, 0.18),
           0 10px 24px rgba(0, 0, 0, 0.25);
       }
 
@@ -270,7 +281,12 @@
         background: var(--team-idle);
         border: 1px solid rgba(0, 0, 0, 0.35);
 
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial,
+        font-family:
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Arial,
           sans-serif;
         font-weight: 900;
         font-size: 40px;
@@ -282,7 +298,9 @@
         box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.35);
 
         transform: scale(1);
-        transition: transform 80ms ease-out, background 80ms ease-out,
+        transition:
+          transform 80ms ease-out,
+          background 80ms ease-out,
           border-color 80ms ease-out;
       }
 
@@ -301,14 +319,20 @@
         z-index: 20;
         pointer-events: none;
 
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial,
+        font-family:
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Arial,
           sans-serif;
         font-weight: 800;
         font-size: 150px;
 
         color: rgba(220, 220, 220, 0.45);
         -webkit-text-stroke: 6px rgba(255, 255, 255, 0.18);
-        text-shadow: 0 10px 30px rgba(0, 0, 0, 0.25),
+        text-shadow:
+          0 10px 30px rgba(0, 0, 0, 0.25),
           0 2px 0 rgba(255, 255, 255, 0.1);
 
         display: none;
@@ -586,8 +610,8 @@
         return team === "red"
           ? Math.PI / 2
           : team === "blue"
-          ? -Math.PI / 2
-          : 0;
+            ? -Math.PI / 2
+            : 0;
       }
 
       // set view to "inward like title screen"
@@ -682,6 +706,7 @@
       let wasServerRunning = false;
       let joined = false;
       let pendingJoin = false; // ✅ NEW
+      let dashRequested = false;
 
       const lastPos = new Map(); // id -> {x,z,t}
       function getVelocity(p) {
@@ -811,6 +836,12 @@
         },
         true
       );
+
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "KeyR") {
+          dashRequested = true;
+        }
+      });
 
       renderer.domElement.tabIndex = 0;
       renderer.domElement.style.outline = "none";
@@ -996,7 +1027,8 @@
 
       // --- 1st-person hood strip (camera-locked) ---
       let myHood = null;
-
+      let dashDot = null;
+      let dashDotText = null;
       {
         const hoodGeom = new THREE.BoxGeometry(2.25, 0.22, 0.35);
         const hoodMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
@@ -1011,6 +1043,61 @@
 
         camera.add(myHood);
         myHood.visible = false; // will be enabled in setCameraMode("first")
+        // --- Dash dot + text (camera-locked) ---
+        function makeDashTextSprite() {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          canvas.width = 256;
+          canvas.height = 128;
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Big "R"
+          ctx.font = "900 64px system-ui";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.lineWidth = 8;
+          ctx.strokeStyle = "rgba(0,0,0,0.85)";
+          ctx.fillStyle = "rgba(255,255,255,0.98)";
+          ctx.strokeText("R", canvas.width / 2, 50);
+          ctx.fillText("R", canvas.width / 2, 50);
+
+          // Small "to dash"
+          ctx.font = "900 28px system-ui";
+          ctx.lineWidth = 6;
+          ctx.strokeText("to dash", canvas.width / 2, 92);
+          ctx.fillText("to dash", canvas.width / 2, 92);
+
+          const tex = new THREE.CanvasTexture(canvas);
+          tex.needsUpdate = true;
+
+          const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+          mat.depthTest = false;
+          mat.depthWrite = false;
+
+          const spr = new THREE.Sprite(mat);
+          spr.renderOrder = 1001;
+          spr.scale.set(0.55, 0.275, 1); // sized to fit inside the circle
+          return spr;
+        }
+
+        // a bit bigger so the text fits (still inside the hood/player box)
+        const dotGeom = new THREE.CircleGeometry(0.13, 32);
+        const dotMat = new THREE.MeshBasicMaterial({ color: 0xd3d3d3 });
+        dotMat.depthTest = false;
+        dotMat.depthWrite = false;
+
+        dashDot = new THREE.Mesh(dotGeom, dotMat);
+        dashDot.renderOrder = 1000;
+        dashDot.position.set(0, -0.95, -1.16);
+        camera.add(dashDot);
+        dashDot.visible = false;
+
+        // text centered on the dot
+        dashDotText = makeDashTextSprite();
+        dashDotText.position.set(0, -0.95, -1.155); // tiny nudge forward to avoid z-fight
+        camera.add(dashDotText);
+        dashDotText.visible = false;
       }
 
       // ================= FLAGS (PART C) =================
@@ -1144,6 +1231,7 @@
       window.addEventListener("beforeunload", closeWS);
       let myId = null;
       let lastServerSpeed = 0;
+      let myDashCooldownUntil = 0;
       const MODEL_YAW_OFFSET = Math.PI;
       // ---- smoothing for my car (client-side interpolation) ----
       const myBuf = []; // [{x,z,yaw,t}]
@@ -1230,7 +1318,15 @@
         if (!joined) return;
         if (paused) return;
 
-        ws.send(JSON.stringify({ type: "input", ...keys, yaw: viewYaw }));
+        ws.send(
+          JSON.stringify({
+            type: "input",
+            ...keys,
+            yaw: viewYaw,
+            dash: dashRequested,
+          })
+        );
+        dashRequested = false; // consume the dash so it only triggers once
       }, 50);
 
       // keep trying hello until server reflects it
@@ -1249,7 +1345,7 @@
               ">": "&gt;",
               '"': "&quot;",
               "'": "&#39;",
-            }[c])
+            })[c]
         );
       }
 
@@ -1261,13 +1357,13 @@
         const col = team ? scoreboardTeamColor(team) : "rgba(255,255,255,0.9)";
 
         return `
-                            <div class="lbLine">
-                              <span class="lbLineName" style="color:${col}">
-                                ${esc(name)}
-                              </span>
-                              <span class="lbLineValue">- ${value}</span>
-                            </div>
-                          `;
+                                        <div class="lbLine">
+                                          <span class="lbLineName" style="color:${col}">
+                                            ${esc(name)}
+                                          </span>
+                                          <span class="lbLineValue">- ${value}</span>
+                                        </div>
+                                      `;
       }
 
       function renderTop(list, n = 2) {
@@ -1340,15 +1436,15 @@
           };
 
           leaderboardMount.innerHTML = `
-                            <div class="lbStatTitle">Kills:</div>
-                            ${renderTop(leaders.kills, 3)}
+                                        <div class="lbStatTitle">Kills:</div>
+                                        ${renderTop(leaders.kills, 3)}
 
-                            <div class="lbStatTitle">Flag Captures:</div>
-                            ${renderTop(leaders.captures, 3)}
+                                        <div class="lbStatTitle">Flag Captures:</div>
+                                        ${renderTop(leaders.captures, 3)}
 
-                            <div class="lbStatTitle">Points:</div>
-                            ${renderTop(leaders.points, 3)}
-                          `;
+                                        <div class="lbStatTitle">Points:</div>
+                                        ${renderTop(leaders.points, 3)}
+                                      `;
         }
         // roster UI
         const roster = Array.isArray(msg.roster) ? msg.roster : [];
@@ -1363,7 +1459,7 @@
                 ">": "&gt;",
                 '"': "&quot;",
                 "'": "&#39;",
-              }[c])
+              })[c]
           );
         }
 
@@ -1423,6 +1519,7 @@
 
               lastServerSpeed = p.speed;
               myLockUntil = p.lock ?? 0;
+              myDashCooldownUntil = p.dashCd ?? 0;
 
               myBuf.push({ x: p.x, z: p.z, yaw: p.yaw, t: nowT });
               while (myBuf.length > 30) myBuf.shift();
@@ -1713,6 +1810,21 @@
         // --- keep marker exactly on the collision radius at the front ---
         if (frontMarker) {
           const nowS = Date.now() / 1000;
+
+          // Dash dot: neon green when R is ready (own half + no cooldown), else UI gray
+          if (dashDot) {
+            const inOwnHalf =
+              (myTeam === "red" && car.position.x <= 0) ||
+              (myTeam === "blue" && car.position.x >= 0);
+
+            const offCooldown = nowS >= (myDashCooldownUntil ?? 0);
+            const dashReady = joined && inOwnHalf && offCooldown;
+
+            const firstPerson = cameraMode === "first";
+            dashDot.visible = joined && firstPerson; // “inside the black of your character”
+            dashDot.material.color.setHex(dashReady ? 0x00ff78 : 0xd3d3d3);
+            if (dashDotText) dashDotText.visible = joined && firstPerson;
+          }
 
           const firstPerson = cameraMode === "first";
           const notSpectating = deathSpectatorUntil <= nowS;
